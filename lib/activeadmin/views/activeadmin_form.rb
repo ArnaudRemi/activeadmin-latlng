@@ -7,33 +7,53 @@ module ActiveAdmin
         map    = args[:map]    || :google
         id_lat = args[:id_lat] || "#{class_name}_lat"
         id_lng = args[:id_lng] || "#{class_name}_lng"
+        start_lat = args[:start_lat] || 0.0
+        start_lng = args[:start_lng] || 0.0
         height = args[:height] || 400
+        api_key = args[:api_key] || ENV.fetch('GMAPS_API_KEY', '')
         loading_map = args[:loading_map].nil? ? true : args[:loading_map]
 
         case map
-        when :yandex
-          insert_tag(YandexMapProxy, form_builder, lang, id_lat, id_lng, height, loading_map)
-        when :google
-          insert_tag(GoogleMapProxy, form_builder, lang, id_lat, id_lng, height, loading_map)
-        else
-          insert_tag(GoogleMapProxy, form_builder, lang, id_lat, id_lng, height, loading_map)
+          when :yandex
+            insert_tag(YandexMapProxy, form_builder, lang, id_lat, id_lng, start_lat, start_lng, height, loading_map)
+          when :google
+            insert_tag(GoogleMapProxy, form_builder, lang, id_lat, id_lng, start_lat, start_lng, height, loading_map, api_key)
+          else
+            insert_tag(GoogleMapProxy, form_builder, lang, id_lat, id_lng, start_lat, start_lng, height, loading_map, api_key)
         end
       end
     end
 
     class LatlngProxy < FormtasticProxy
       def build(form_builder, *args, &block)
-        @lang, @id_lat, @id_lng, @height, @loading_map = *args
+        @lang, @id_lat, @id_lng, @start_lat, @start_lng, @height, @loading_map, @api_key = *args
       end
     end
 
     class GoogleMapProxy < LatlngProxy
       def to_s
-        loading_map_code = @loading_map ? "<script src=\"https://maps.googleapis.com/maps/api/js?language=#{@lang}&callback=googleMapObject.init\" async defer></script>" : ''
+        loading_map_code = @loading_map ? "<script src=\"https://maps.googleapis.com/maps/api/js?key=#{@api_key}&language=#{@lang}&callback=googleMapObject.init\" async defer></script>" : ''
         "<li>" \
         "#{loading_map_code}" \
         "<div id=\"google_map\" style=\"height: #{@height}px\"></div>" \
         "<script>
+          var _lat = #{@start_lat}, _lng = #{@start_lng};
+          function __getGeoLocation() {
+              if (navigator.geolocation)
+                  navigator.geolocation.getCurrentPosition(_successGeoLocation);
+              else
+                  console.log(\"Geolocation is not supported by this browser.\");
+          }
+          function _successGeoLocation(pos) {
+            if(googleMapObject.coords.lat == _lat && googleMapObject.coords.lng == _lng) {
+              googleMapObject.coords.lat = pos.coords.latitude;
+              googleMapObject.coords.lng = pos.coords.longitude;
+              googleMapObject.marker.setPosition(googleMapObject.coords);
+              $(\"##{@id_lat}\").val( googleMapObject.coords.lat.toFixed(10) );
+              $(\"##{@id_lng}\").val( googleMapObject.coords.lng.toFixed(10) );
+            }
+          }
+
           var googleMapObject = {
             coords: null,
             map: null,
@@ -41,8 +61,8 @@ module ActiveAdmin
 
             getCoordinates: function() {
               return {
-                lat: parseFloat($(\"##{@id_lat}\").val()) || 55.7522200,
-                lng: parseFloat($(\"##{@id_lng}\").val()) || 37.6155600,
+                lat: parseFloat($(\"##{@id_lat}\").val()) || _lat,
+                lng: parseFloat($(\"##{@id_lng}\").val()) || _lng
               };
             },
 
@@ -52,6 +72,7 @@ module ActiveAdmin
             },
 
             init: function() {
+              __getGeoLocation();
               googleMapObject.coords = googleMapObject.getCoordinates();
               googleMapObject.saveCoordinates();
 
@@ -89,6 +110,22 @@ module ActiveAdmin
         "#{loading_map_code}" \
         "<div id=\"yandex_map\" style=\"height: #{@height}px\"></div>" \
         "<script type=\"text/javascript\">
+          var _lat = #{@start_lat}, _lng = #{@start_lng};
+          function __getGeoLocation() {
+              if (navigator.geolocation)
+                  navigator.geolocation.getCurrentPosition(_successGeoLocation);
+              else
+                  console.log(\"Geolocation is not supported by this browser.\");
+          }
+          function _successGeoLocation(pos) {
+            if(yandexMapObject.coords[0] == _lat && yandexMapObject.coords[1] == _lng) {
+              yandexMapObject.coords = [pos.coords.latitude, pos.coords.longitude];
+              yandexMapObject.placemark.geometry.setCoordinates(yandexMapObject.coords);
+              yandexMapObject.map.setCenter(yandexMapObject.coords);
+              $(\"##{@id_lat}\").val( yandexMapObject.coords[0].toFixed(10) );
+              $(\"##{@id_lng}\").val( yandexMapObject.coords[1].toFixed(10) );
+            }
+          }
           var yandexMapObject = {
             coords: null,
             map: null,
@@ -96,8 +133,8 @@ module ActiveAdmin
 
             getCoordinates: function() {
               return [
-                parseFloat($(\"##{@id_lat}\").val()) || 55.7522200,
-                parseFloat($(\"##{@id_lng}\").val()) || 37.6155600,
+                parseFloat($(\"##{@id_lat}\").val()) || _lat,
+                parseFloat($(\"##{@id_lng}\").val()) || _lng,
               ];
             },
 
@@ -107,6 +144,7 @@ module ActiveAdmin
             },
 
             init: function() {
+              __getGeoLocation();
               yandexMapObject.coords = yandexMapObject.getCoordinates();
               yandexMapObject.saveCoordinates();
 
@@ -131,7 +169,10 @@ module ActiveAdmin
             }
           }
 
-          ymaps.ready(yandexMapObject.init);
+          document.addEventListener(\"DOMContentLoaded\", function(event) {
+            ymaps.ready(yandexMapObject.init);
+            console.log('Initialized Yandex!')
+          });
         </script>" \
         "</li>"
       end
