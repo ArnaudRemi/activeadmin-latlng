@@ -32,7 +32,7 @@ module ActiveAdmin
 
     class GoogleMapProxy < LatlngProxy
       def to_s
-        loading_map_code = @loading_map ? "<script src=\"https://maps.googleapis.com/maps/api/js?key=#{@api_key}&language=#{@lang}&callback=googleMapObject.init\" async defer></script>" : ''
+        loading_map_code = @loading_map ? "<script src=\"https://maps.googleapis.com/maps/api/js?key=#{@api_key}&language=#{@lang}&callback=googleMapObject.init&libraries=places\" async defer></script>" : ''
         "<li>" \
         "#{loading_map_code}" \
         "<div id=\"google_map\" style=\"height: #{@height}px\"></div>" \
@@ -96,9 +96,47 @@ module ActiveAdmin
                 googleMapObject.coords = { lat: e.latLng.lat(), lng: e.latLng.lng() };
                 googleMapObject.saveCoordinates();
               });
+
+
+              var searchBox = new google.maps.places.SearchBox(document.getElementById('pac-input'));
+              googleMapObject.map.controls[google.maps.ControlPosition.TOP_CENTER].push(document.getElementById('pac-input'));
+              google.maps.event.addListener(searchBox, 'places_changed', function() {
+                searchBox.set('map', null);
+                var places = searchBox.getPlaces();
+
+                var bounds = new google.maps.LatLngBounds();
+                var i, place;
+                for (i = 0; place = places[i]; i++) {
+                  (function(place) {
+                    var marker = new google.maps.Marker({
+
+                      position: place.geometry.location
+                    });
+                    marker.bindTo('map', searchBox, 'map');
+                    google.maps.event.addListener(marker, 'map_changed', function() {
+                      if (!this.getMap()) {
+                        this.unbindAll();
+                      }
+                    });
+                    bounds.extend(place.geometry.location);
+
+
+                  }(place));
+
+                }
+                googleMapObject.map.fitBounds(bounds);
+                searchBox.set('map', googleMapObject.map);
+                googleMapObject.map.setZoom(Math.min(googleMapObject.map.getZoom(),12));
+
+              });
             }
           }
+
+          google.maps.event.addDomListener(window, 'load', init);
+
+
         </script>" \
+        "<input id=\"pac-input\" class=\"controls\" type=\"text\" placeholder=\"Search Box\">"\
         "</li>"
       end
     end
