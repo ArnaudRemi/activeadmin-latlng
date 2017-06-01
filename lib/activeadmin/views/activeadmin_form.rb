@@ -78,7 +78,11 @@ module ActiveAdmin
 
               googleMapObject.map = new google.maps.Map(document.getElementById('google_map'), {
                 center: googleMapObject.coords,
-                zoom: 12
+                zoom: 12,
+                zoomControl: false,
+                scaleControl: false,
+                scrollwheel: false,
+                disableDoubleClickZoom: true,
               });
               
               var latLngCoord = new google.maps.LatLng(googleMapObject.coords.lat, googleMapObject.coords.lng);
