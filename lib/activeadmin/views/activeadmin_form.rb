@@ -113,9 +113,10 @@ module ActiveAdmin
                 for (i = 0; place = places[i]; i++) {
                   (function(place) {
                     var marker = new google.maps.Marker({
-
                       position: place.geometry.location
                     });
+                    $(\"##{@id_lat}\").val( place.geometry.location.lat() );
+                    $(\"##{@id_lng}\").val( place.geometry.location.lng() );
                     marker.bindTo('map', searchBox, 'map');
                     google.maps.event.addListener(marker, 'map_changed', function() {
                       if (!this.getMap()) {
@@ -123,7 +124,8 @@ module ActiveAdmin
                       }
                     });
                     bounds.extend(place.geometry.location);
-
+                    googleMapObject.marker.setMap(null);
+                    googleMapObject.marker = marker;
 
                   }(place));
 
